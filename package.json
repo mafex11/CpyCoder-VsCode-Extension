@@ -1,8 +1,8 @@
 {
   "name": "cpycoder",
-  "displayName": "cpycoder",
-  "description": "Copy important project code (with dependencies) for AI tools or sharing.",
-  "version": "0.0.6",
+  "displayName": "CpyCoder",
+  "description": "Copy your repo context — compressed, AI-ready — to clipboard or file. Feed any chat interface with the code it needs.",
+  "version": "2.0.0",
   "publisher": "mafex",
   "icon": "icon.png",
   "repository": {
@@ -10,57 +10,190 @@
     "url": "https://github.com/mafex11/cpycoder2"
   },
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:cpycoder.copySelectedFiles",
-    "onView:cpycoderFileTree"
+  "keywords": [
+    "ai",
+    "context",
+    "clipboard",
+    "copy",
+    "chatgpt",
+    "claude",
+    "llm",
+    "code sharing"
   ],
-  "main": "./extension.js",
+  "activationEvents": [],
+  "main": "./out/extension.js",
   "contributes": {
-    "views": {
-      "explorer": [
+    "viewsContainers": {
+      "activitybar": [
         {
-          "id": "cpycoderFileTree",
-          "name": "CpyCoder File Picker"
+          "id": "cpycoder",
+          "title": "CpyCoder",
+          "icon": "$(files)"
+        }
+      ]
+    },
+    "views": {
+      "cpycoder": [
+        {
+          "id": "cpycoder.fileTree",
+          "name": "Files"
+        },
+        {
+          "id": "cpycoder.selected",
+          "name": "Selected"
         }
       ]
     },
     "commands": [
       {
-        "command": "cpycoder.selectFile",
-        "title": "CpyCoder: Select File to Copy"
+        "command": "cpycoder.copyToClipboard",
+        "title": "CpyCoder: Copy to Clipboard",
+        "icon": "$(clippy)"
       },
       {
-        "command": "cpycoder.copySelectedFiles",
-        "title": "CpyCoder: Copy Selected Files"
+        "command": "cpycoder.exportToFile",
+        "title": "CpyCoder: Export to File",
+        "icon": "$(export)"
       },
       {
         "command": "cpycoder.clearSelection",
-        "title": "CpyCoder: Clear File Selection"
+        "title": "CpyCoder: Clear Selection",
+        "icon": "$(clear-all)"
       },
       {
         "command": "cpycoder.refreshTree",
-        "title": "CpyCoder: Refresh File Tree"
+        "title": "CpyCoder: Refresh File Tree",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "cpycoder.toggleFile",
+        "title": "Toggle File Selection"
+      },
+      {
+        "command": "cpycoder.toggleFolder",
+        "title": "Toggle Folder Selection"
+      },
+      {
+        "command": "cpycoder.removeFromSelected",
+        "title": "Remove from Selection",
+        "icon": "$(close)"
+      },
+      {
+        "command": "cpycoder.selectOpenEditors",
+        "title": "CpyCoder: Select Open Editors",
+        "icon": "$(window)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "cpycoder.copyToClipboard",
+          "when": "view == cpycoder.selected",
+          "group": "navigation@1"
+        },
+        {
+          "command": "cpycoder.exportToFile",
+          "when": "view == cpycoder.selected",
+          "group": "navigation@2"
+        },
+        {
+          "command": "cpycoder.clearSelection",
+          "when": "view == cpycoder.selected",
+          "group": "navigation@3"
+        },
+        {
+          "command": "cpycoder.refreshTree",
+          "when": "view == cpycoder.fileTree",
+          "group": "navigation"
+        },
+        {
+          "command": "cpycoder.selectOpenEditors",
+          "when": "view == cpycoder.fileTree",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "cpycoder.removeFromSelected",
+          "when": "view == cpycoder.selected",
+          "group": "inline"
+        }
+      ]
+    },
     "keybindings": [
       {
-        "command": "cpycoder.copySelectedFiles",
+        "command": "cpycoder.copyToClipboard",
         "key": "ctrl+shift+c",
-        "when": "explorerViewletVisible"
+        "mac": "cmd+shift+c",
+        "when": "view.cpycoder.selected.visible"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "CpyCoder",
+      "properties": {
+        "cpycoder.compression": {
+          "type": "string",
+          "default": "smart",
+          "enum": ["none", "smart", "aggressive"],
+          "enumDescriptions": [
+            "No compression — raw file contents",
+            "Smart — strip comments, collapse whitespace, keep structure readable",
+            "Aggressive — minify identifiers in non-public APIs, maximum token savings"
+          ],
+          "description": "How much to compress file contents for AI readability"
+        },
+        "cpycoder.outputFormat": {
+          "type": "string",
+          "default": "xml",
+          "enum": ["xml", "markdown", "plain"],
+          "enumDescriptions": [
+            "XML tags — best for Claude, ChatGPT, and most LLMs",
+            "Markdown code blocks — good for chat interfaces with markdown rendering",
+            "Plain text with separators — simple, universal"
+          ],
+          "description": "Output format for the copied context"
+        },
+        "cpycoder.includeTreeSummary": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prepend a directory tree summary of selected files"
+        },
+        "cpycoder.maxTokenEstimate": {
+          "type": "number",
+          "default": 100000,
+          "description": "Warn when estimated token count exceeds this limit"
+        },
+        "cpycoder.respectGitignore": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide files matching .gitignore patterns"
+        },
+        "cpycoder.excludePatterns": {
+          "type": "array",
+          "default": ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**", "**/*.lock", "**/*.map"],
+          "description": "Glob patterns to exclude from the file tree"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
   },
   "devDependencies": {
-    "@types/node": "20.x",
-    "@types/vscode": "^1.90.0"
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^2.24.0"
   },
   "dependencies": {
-    "@babel/parser": "^7.27.0",
-    "@babel/traverse": "^7.27.0"
+    "ignore": "^5.3.1"
   }
 }
