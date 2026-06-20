@@ -16,6 +16,37 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.window.registerTreeDataProvider('cpycoder.fileTree', fileTreeProvider);
   vscode.window.registerTreeDataProvider('cpycoder.selected', selectedFilesProvider);
 
+  // Status bar item — always shows selection count + token estimate
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  statusBar.command = 'cpycoder.copyToClipboard';
+  statusBar.tooltip = 'Click to copy context to clipboard';
+  context.subscriptions.push(statusBar);
+
+  function updateStatusBar() {
+    const count = selectionManager.size;
+    if (count === 0) {
+      statusBar.hide();
+      return;
+    }
+    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!rootPath) { statusBar.hide(); return; }
+
+    let totalBytes = 0;
+    for (const relPath of selectionManager.getAll()) {
+      try {
+        const stat = fs.statSync(path.join(rootPath, relPath));
+        totalBytes += stat.size;
+      } catch {}
+    }
+    const tokens = Math.ceil(totalBytes / 4);
+    const tokenStr = tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : `${tokens}`;
+    statusBar.text = `$(clippy) CpyCoder: ${count} file${count > 1 ? 's' : ''} (~${tokenStr} tokens)`;
+    statusBar.show();
+  }
+
+  selectionManager.onDidChange(updateStatusBar);
+  updateStatusBar();
+
   context.subscriptions.push(
     vscode.commands.registerCommand('cpycoder.toggleFile', (item: FileTreeItem) => {
       selectionManager.toggle(item.relativePath);
@@ -70,6 +101,46 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(`CpyCoder: Added ${count} open editor(s)`);
     }),
 
+    vscode.commands.registerCommand('cpycoder.addFromExplorer', (uri: vscode.Uri) => {
+      const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!rootPath || !uri) return;
+      const rel = path.relative(rootPath, uri.fsPath);
+      if (!selectionManager.has(rel)) {
+        selectionManager.add(rel);
+        vscode.window.showInformationMessage(`CpyCoder: Added ${path.basename(rel)}`);
+      }
+    }),
+
+    vscode.commands.registerCommand('cpycoder.addFolderFromExplorer', (uri: vscode.Uri) => {
+      const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!rootPath || !uri) return;
+      const files = getAllFilesInFolder(uri.fsPath, rootPath);
+      let added = 0;
+      files.forEach(f => {
+        if (!selectionManager.has(f)) { selectionManager.add(f); added++; }
+      });
+      vscode.window.showInformationMessage(`CpyCoder: Added ${added} file(s) from ${path.basename(uri.fsPath)}`);
+    }),
+
+    vscode.commands.registerCommand('cpycoder.copyWithFormat', async () => {
+      const format = await vscode.window.showQuickPick(
+        [
+          { label: '$(code) XML', description: 'Best for Claude, ChatGPT, and most LLMs', value: 'xml' as OutputFormat },
+          { label: '$(markdown) Markdown', description: 'Good for chat interfaces with rendering', value: 'markdown' as OutputFormat },
+          { label: '$(file-text) Plain Text', description: 'Simple separators, universal', value: 'plain' as OutputFormat },
+        ],
+        { placeHolder: 'Choose output format' }
+      );
+      if (!format) return;
+      const output = buildOutput(selectionManager, format.value);
+      if (!output) return;
+      await vscode.env.clipboard.writeText(output.text);
+      const tokens = estimateTokens(output.text);
+      vscode.window.showInformationMessage(
+        `Copied ${output.fileCount} file(s) as ${format.value.toUpperCase()} (~${formatTokenCount(tokens)} tokens)`
+      );
+    }),
+
     vscode.commands.registerCommand('cpycoder.copyToClipboard', async () => {
       const output = buildOutput(selectionManager);
       if (!output) return;
@@ -114,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-function buildOutput(selectionManager: SelectionManager): { text: string; fileCount: number } | null {
+function buildOutput(selectionManager: SelectionManager, formatOverride?: OutputFormat): { text: string; fileCount: number } | null {
   const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!rootPath) {
     vscode.window.showErrorMessage('No workspace open');
@@ -129,7 +200,7 @@ function buildOutput(selectionManager: SelectionManager): { text: string; fileCo
 
   const config = vscode.workspace.getConfiguration('cpycoder');
   const compressionLevel = config.get<CompressionLevel>('compression', 'smart');
-  const outputFormat = config.get<OutputFormat>('outputFormat', 'xml');
+  const outputFormat = formatOverride || config.get<OutputFormat>('outputFormat', 'xml');
   const includeTree = config.get<boolean>('includeTreeSummary', true);
 
   const files: { path: string; content: string }[] = [];

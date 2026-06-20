@@ -1,5 +1,3 @@
-import * as vscode from 'vscode';
-
 export type CompressionLevel = 'none' | 'smart' | 'aggressive';
 
 export function compress(content: string, filePath: string, level: CompressionLevel): string {

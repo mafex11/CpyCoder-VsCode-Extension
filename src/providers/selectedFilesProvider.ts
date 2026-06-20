@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import { SelectionManager } from './selectionManager';
 
@@ -15,24 +16,35 @@ export class SelectedFilesProvider implements vscode.TreeDataProvider<SelectedFi
   }
 
   getChildren(): SelectedFileItem[] {
+    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     const files = this.selectionManager.getAll();
-    return files.map(f => new SelectedFileItem(f));
+    return files.map(f => new SelectedFileItem(f, rootPath));
   }
 }
 
 class SelectedFileItem extends vscode.TreeItem {
-  constructor(public readonly relativePath: string) {
+  constructor(public readonly relativePath: string, rootPath: string) {
     super(path.basename(relativePath), vscode.TreeItemCollapsibleState.None);
-    this.description = path.dirname(relativePath) === '.' ? '' : path.dirname(relativePath);
-    this.tooltip = relativePath;
+
+    const fullPath = path.join(rootPath, relativePath);
+    let tokenStr = '';
+    try {
+      const stat = fs.statSync(fullPath);
+      const tokens = Math.ceil(stat.size / 4);
+      tokenStr = tokens >= 1000 ? `~${(tokens / 1000).toFixed(1)}k tok` : `~${tokens} tok`;
+    } catch {
+      tokenStr = '?';
+    }
+
+    const dir = path.dirname(relativePath);
+    this.description = `${dir === '.' ? '' : dir + '  '}${tokenStr}`;
+    this.tooltip = `${relativePath} (${tokenStr})`;
     this.contextValue = 'selectedFile';
     this.iconPath = new vscode.ThemeIcon('file');
     this.command = {
       command: 'vscode.open',
       title: 'Open File',
-      arguments: [vscode.Uri.file(
-        path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', relativePath)
-      )]
+      arguments: [vscode.Uri.file(fullPath)]
     };
   }
 }

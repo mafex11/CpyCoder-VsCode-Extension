@@ -56,6 +56,11 @@
         "icon": "$(clippy)"
       },
       {
+        "command": "cpycoder.copyWithFormat",
+        "title": "CpyCoder: Copy (Choose Format)",
+        "icon": "$(symbol-enum)"
+      },
+      {
         "command": "cpycoder.exportToFile",
         "title": "CpyCoder: Export to File",
         "icon": "$(export)"
@@ -87,6 +92,14 @@
         "command": "cpycoder.selectOpenEditors",
         "title": "CpyCoder: Select Open Editors",
         "icon": "$(window)"
+      },
+      {
+        "command": "cpycoder.addFromExplorer",
+        "title": "CpyCoder: Add to Context"
+      },
+      {
+        "command": "cpycoder.addFolderFromExplorer",
+        "title": "CpyCoder: Add Folder to Context"
       }
     ],
     "menus": {
@@ -97,14 +110,19 @@
           "group": "navigation@1"
         },
         {
-          "command": "cpycoder.exportToFile",
+          "command": "cpycoder.copyWithFormat",
           "when": "view == cpycoder.selected",
           "group": "navigation@2"
         },
         {
-          "command": "cpycoder.clearSelection",
+          "command": "cpycoder.exportToFile",
           "when": "view == cpycoder.selected",
           "group": "navigation@3"
+        },
+        {
+          "command": "cpycoder.clearSelection",
+          "when": "view == cpycoder.selected",
+          "group": "navigation@4"
         },
         {
           "command": "cpycoder.refreshTree",
@@ -122,6 +140,24 @@
           "command": "cpycoder.removeFromSelected",
           "when": "view == cpycoder.selected",
           "group": "inline"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "cpycoder.addFromExplorer",
+          "when": "!explorerResourceIsFolder",
+          "group": "cpycoder@1"
+        },
+        {
+          "command": "cpycoder.addFolderFromExplorer",
+          "when": "explorerResourceIsFolder",
+          "group": "cpycoder@1"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "cpycoder.addFromExplorer",
+          "group": "cpycoder@1"
         }
       ]
     },
